@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <title>SSTV Decoder - Multi Modo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg: #000;
+      --accent: #FE2C55;
+      --text: #fff;
+      --card: #1a1a1a;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 2rem;
+      color: var(--accent);
+    }
+    .mode-selector {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .mode-btn {
+      background: var(--card);
+      border: 2px solid var(--accent);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s ease;
+    }
+    .mode-btn.active,
+    .mode-btn:hover {
+      background: var(--accent);
+      color: #000;
+    }
+    canvas {
+      border: 2px solid var(--accent);
+      margin-top: 20px;
+    }
+    .controls {
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    input, button {
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      background: var(--card);
+      color: var(--text);
+    }
+    button:hover {
+      background: var(--accent);
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <h1>SSTV Decoder</h1>
+  <div class="mode-selector" id="modeSelector"></div>
+  <div class="controls">
+    <input type="file" accept=".wav" id="audioFile">
+    <button onclick="startMicrophone()">Usar Microfone</button>
+  </div>
+  <canvas id="sstvCanvas" width="320" height="256"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/gh/flatmax/jsSDR/js/sstv.min.js"></script>
+  <script>
+    const canvas = document.getElementById('sstvCanvas');
+    const ctx = canvas.getContext('2d');
+    const modeSelector = document.getElementById('modeSelector');
+    const availableModes = ['MartinM1', 'Robot36', 'Scottie1', 'Scottie2', 'MartinM2'];
+    let selectedMode = 'MartinM1';
+
+    availableModes.forEach(mode => {
+      const btn = document.createElement('button');
+      btn.textContent = mode;
+      btn.className = 'mode-btn';
+      if (mode === selectedMode) btn.classList.add('active');
+      btn.onclick = () => {
+        selectedMode = mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      };
+      modeSelector.appendChild(btn);
+    });
+
+    function decodeAudio(audioData) {
+      const decoder = new SSTV.SSTVDecoder(selectedMode, {
+        width: 320,
+        height: 256,
+        onLine: (lineNum, rgbArray) => {
+          const imageData = ctx.getImageData(0, lineNum, 320, 1);
+          for (let x = 0; x < 320; x++) {
+            const idx = x * 4;
+            imageData.data[idx] = rgbArray[x * 3];
+            imageData.data[idx + 1] = rgbArray[x * 3 + 1];
+            imageData.data[idx + 2] = rgbArray[x * 3 + 2];
+            imageData.data[idx + 3] = 255;
+          }
+          ctx.putImageData(imageData, 0, lineNum);
+        }
+      });
+      decoder.decode(audioData);
+    }
+
+    document.getElementById('audioFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtx.decodeAudioData(ev.target.result, function(buffer) {
+          decodeAudio(buffer.getChannelData(0));
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function startMicrophone() {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const mic = audioCtx.createMediaStreamSource(stream);
+        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+        const samples = [];
+
+        processor.onaudioprocess = function(e) {
+          const input = e.inputBuffer.getChannelData(0);
+          for (let i = 0; i < input.length; i++) {
+            samples.push(input[i]);
+          }
+          if (samples.length > 44100 * 12) {
+            mic.disconnect();
+            processor.disconnect();
+            decodeAudio(samples);
+          }
+        };
+
+        mic.connect(processor);
+        processor.connect(audioCtx.destination);
+      }).catch(function(err) {
+        alert("Erro ao aceder ao microfone: " + err);
+      });
+    }
+  </script>
+</body>
+</html>
