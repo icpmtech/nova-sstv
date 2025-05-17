@@ -191,12 +191,13 @@
     }
     
     #decodedImage {
-      display: none;
+      display: block;
       border: 2px solid var(--accent);
       border-radius: 8px;
       max-width: 320px;
       width: 100%;
       image-rendering: pixelated;
+      height: 256px;
     }
     
     .progress-container {
@@ -429,6 +430,38 @@
       align-items: center;
       justify-content: center;
     }
+    
+    /* Visualização em tempo real */
+    .display-modes {
+      display: flex;
+      gap: 10px;
+      margin: 15px 0;
+      justify-content: center;
+    }
+    
+    .display-mode {
+      background: transparent;
+      border: 2px solid var(--accent);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+    
+    .display-mode.active, 
+    .display-mode:hover {
+      background: var(--accent);
+      color: #000;
+    }
+    
+    .preview-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body class="dark-mode">
@@ -493,6 +526,11 @@
 
     <div class="card">
       <h3>Imagem Decodificada</h3>
+      <div class="display-modes">
+        <button class="display-mode active" data-mode="live">Visualização em Tempo Real</button>
+        <button class="display-mode" data-mode="final">Imagem Final</button>
+      </div>
+      
       <div class="filters">
         <button class="filter-btn active" data-filter="none">Normal</button>
         <button class="filter-btn" data-filter="contrast">Contraste+</button>
@@ -792,9 +830,8 @@
               currentLine = lineNum;
               progressBar.style.width = `${(lineNum / 256) * 100}%`;
               
-              if (lineNum % 5 === 0) {
-                updateImage();
-              }
+              // Atualizar a imagem em tempo real para cada linha decodificada
+              updateImage();
             },
             onDone: () => {
               finishDecoding("Decodificação completa");
