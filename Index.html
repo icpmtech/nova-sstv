@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SSTV Decoder - Martin M1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    canvas {
+      border: 2px solid #fff;
+      margin-top: 20px;
+    }
+    input {
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>SSTV Decoder (Martin M1)</h1>
+  <input type="file" accept=".wav" id="audioFile">
+  <button onclick="startMicrophone()">Usar Microfone</button>
+  <canvas id="sstvCanvas" width="320" height="256"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/gh/flatmax/jsSDR/js/sstv.min.js"></script>
+  <script>
+    const canvas = document.getElementById('sstvCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function decodeAudio(audioBuffer) {
+      const decoder = new SSTV.SSTVDecoder("MartinM1", {
+        width: 320,
+        height: 256,
+        onLine: (lineNum, rgbArray) => {
+          const imageData = ctx.getImageData(0, lineNum, 320, 1);
+          for (let x = 0; x < 320; x++) {
+            const idx = x * 4;
+            imageData.data[idx] = rgbArray[x * 3];
+            imageData.data[idx + 1] = rgbArray[x * 3 + 1];
+            imageData.data[idx + 2] = rgbArray[x * 3 + 2];
+            imageData.data[idx + 3] = 255;
+          }
+          ctx.putImageData(imageData, 0, lineNum);
+        }
+      });
+
+      decoder.decode(audioBuffer);
+    }
+
+    document.getElementById('audioFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtx.decodeAudioData(ev.target.result, function(buffer) {
+          decodeAudio(buffer.getChannelData(0)); // Mono
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function startMicrophone() {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const mic = audioCtx.createMediaStreamSource(stream);
+        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+        const samples = [];
+
+        processor.onaudioprocess = function(e) {
+          const input = e.inputBuffer.getChannelData(0);
+          for (let i = 0; i < input.length; i++) {
+            samples.push(input[i]);
+          }
+
+          if (samples.length > 44100 * 12) { // ~12s
+            mic.disconnect();
+            processor.disconnect();
+            decodeAudio(samples);
+          }
+        };
+
+        mic.connect(processor);
+        processor.connect(audioCtx.destination);
+      }).catch(function(err) {
+        alert("Erro ao aceder ao microfone: " + err);
+      });
+    }
+  </script>
+</body>
+</html>
