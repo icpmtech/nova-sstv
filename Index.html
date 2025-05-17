@@ -2,329 +2,1222 @@
 <html lang="pt-PT">
 <head>
   <meta charset="UTF-8" />
-  <title>SSTV Decoder Aprimorado</title>
+  <title>SSTV Decoder Avançado</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
-      --bg: #000;
+      --bg: #111;
       --accent: #FE2C55;
+      --accent-light: #ff5577;
       --text: #fff;
       --card: #1a1a1a;
-      --spinner-size: 50px;
+      --success: #34c759;
+      --error: #ff3b30;
+      --warning: #ff9500;
     }
-    * { box-sizing: border-box; }
+    
     body {
+      margin: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 2rem;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem;
+      min-height: 100vh;
+      transition: background-color 0.3s ease;
     }
+    
+    .dark-mode {
+      --bg: #111;
+      --card: #1a1a1a;
+      --text: #fff;
+    }
+    
+    .light-mode {
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --text: #333;
+    }
+    
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
+    
     h1 {
+      font-size: 2rem;
       color: var(--accent);
-      margin-bottom: 1rem;
+      text-align: center;
+      margin-bottom: 0.5rem;
     }
-    .mode-selector {
-      margin-bottom: 1rem;
+    
+    .subtitle {
+      color: var(--text);
+      opacity: 0.8;
+      text-align: center;
+      margin-top: 0;
+      margin-bottom: 1.5rem;
     }
-    .mode-selector button {
+    
+    .card {
       background: var(--card);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .mode-selector {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .mode-btn {
+      background: transparent;
       border: 2px solid var(--accent);
       color: var(--text);
       padding: 8px 16px;
-      margin: 0 5px 8px;
       border-radius: 20px;
       cursor: pointer;
       font-weight: bold;
-      transition: background 0.2s;
+      transition: all 0.2s ease;
     }
-    .mode-selector button.active,
-    .mode-selector button:hover {
+    
+    .mode-btn.active,
+    .mode-btn:hover {
       background: var(--accent);
       color: #000;
     }
+    
     .controls {
-      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
     }
-    .controls input,
-    .controls button {
-      padding: 10px;
+    
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    
+    .file-input-wrapper {
+      position: relative;
+      width: 100%;
+      height: 40px;
+      overflow: hidden;
+    }
+    
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      font-size: 100px;
+      opacity: 0;
+      right: 0;
+      top: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .file-input-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      background: var(--card);
+      border: 2px solid var(--accent);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0 15px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .file-input-label:hover {
+      background: var(--accent);
+      color: #000;
+    }
+    
+    button {
+      padding: 10px 16px;
       border-radius: 8px;
       border: none;
-      background: var(--card);
-      color: var(--text);
-      font-size: 1rem;
-      margin: 5px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      background: var(--accent);
+      color: #fff;
       cursor: pointer;
-      min-width: 160px;
+      transition: all 0.2s ease;
+      min-width: 120px;
     }
-    .controls button:hover:not([disabled]) {
+    
+    button:hover {
+      background: var(--accent-light);
+      transform: translateY(-2px);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .image-container {
+      position: relative;
+      width: 320px;
+      height: 256px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    canvas {
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      display: block;
+      background-color: #000;
+    }
+    
+    #decodedImage {
+      display: none;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      max-width: 320px;
+      width: 100%;
+      image-rendering: pixelated;
+    }
+    
+    .progress-container {
+      width: 100%;
+      height: 20px;
+      background-color: var(--card);
+      border-radius: 10px;
+      margin: 15px 0;
+      overflow: hidden;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: var(--accent);
+      border-radius: 10px;
+      transition: width 0.3s ease;
+    }
+    
+    .status {
+      font-size: 0.9rem;
+      color: var(--text);
+      text-align: center;
+      margin: 10px 0;
+      min-height: 20px;
+    }
+    
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 15px 0;
+      justify-content: center;
+    }
+    
+    .filter-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    
+    .filter-btn.active {
       background: var(--accent);
       color: #000;
     }
-    .controls button[disabled] {
-      opacity: 0.5;
-      cursor: not-allowed;
+    
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 1rem;
     }
-    .viewer {
-      position: relative;
-      display: inline-block;
+    
+    .theme-toggle {
+      background: var(--card);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      padding: 5px 10px;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.8rem;
     }
-    canvas, img {
-      display: block;
-      border: 2px solid var(--accent);
-      image-rendering: pixelated;
-      width: 320px;
-      height: 256px;
+    
+    .history-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 15px;
+      justify-content: center;
     }
-    #decodedImage {
-      margin-top: 1rem;
+    
+    .history-image {
+      width: 80px;
+      height: 64px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      cursor: pointer;
+      object-fit: cover;
     }
-    /* Overlay spinner */
-    #overlay {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
+    
+    .history-image:hover {
+      border-width: 2px;
+    }
+    
+    .notification {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 1000;
+    }
+    
+    .show-notification {
+      opacity: 1;
+    }
+    
+    .success {
+      background-color: var(--success);
+    }
+    
+    .error {
+      background-color: var(--error);
+    }
+    
+    .warning {
+      background-color: var(--warning);
+    }
+    
+    @media (max-width: 500px) {
+      .card {
+        padding: 1rem;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+      
+      .image-container {
+        width: 100%;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      canvas {
+        max-width: 100%;
+        height: auto;
+      }
+    }
+    
+    .advanced-options {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 15px;
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease;
+    }
+    
+    .advanced-options.show {
+      max-height: 300px;
+    }
+    
+    .option-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .option-label {
+      font-size: 0.9rem;
+    }
+    
+    input[type="range"] {
+      width: 50%;
+    }
+    
+    input[type="number"] {
+      width: 60px;
+      background: var(--card);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 5px;
+      border-radius: 4px;
+    }
+    
+    .collapsible-header {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: var(--accent);
+    }
+    
+    .collapsible-header:after {
+      content: '\25BC';
+      margin-left: 5px;
+      font-size: 0.8rem;
+      transition: transform 0.3s ease;
+    }
+    
+    .collapsible-header.open:after {
+      transform: rotate(180deg);
+    }
+    
+    .visualization {
+      width: 100%;
+      height: 100px;
+      background: #000;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    
+    /* Loading spinner */
+    .loader {
       display: none;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 3px solid var(--accent);
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .btn-with-loader {
+      display: flex;
       align-items: center;
       justify-content: center;
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    .spinner {
-      width: var(--spinner-size);
-      height: var(--spinner-size);
-      border: 5px solid var(--card);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    /* Progress bar */
-    #progressContainer {
-      width: 320px;
-      margin: 1rem auto;
-      background: #222;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    #progressBar {
-      width: 0%;
-      height: 10px;
-      background: var(--accent);
-      transition: width 0.1s;
-    }
-    #statusText {
-      margin-top: 0.5rem;
-      font-size: 0.9rem;
-      color: var(--accent);
-      min-height: 1.2em;
-    }
-    /* Spectrum */
-    #spectrumCanvas {
-      margin-top: 1.5rem;
-      width: 640px; height: 100px;
-      background: #111;
-      display: block; margin-left: auto; margin-right: auto;
-      border-radius: 8px;
-    }
   </style>
 </head>
-<body>
+<body class="dark-mode">
+  <div class="container">
+    <div class="header-row">
+      <div></div>
+      <h1>SSTV Decoder Avançado</h1>
+      <button class="theme-toggle" id="themeToggle">Modo Claro</button>
+    </div>
+    <p class="subtitle">Decodificador de Slow Scan Television com recursos avançados</p>
 
-  <h1>SSTV Decoder Aprimorado</h1>
+    <div class="card">
+      <h3>Modo de Decodificação</h3>
+      <div class="mode-selector" id="modeSelector"></div>
+    </div>
 
-  <div class="mode-selector" id="modeSelector"></div>
+    <div class="card">
+      <h3>Entrada de Áudio</h3>
+      <div class="controls">
+        <div class="file-input-wrapper">
+          <input type="file" accept=".wav,.mp3" id="audioFile" />
+          <div class="file-input-label" id="fileLabel">Escolher Ficheiro de Áudio (.wav, .mp3)</div>
+        </div>
+        <div class="btn-row">
+          <button id="startButton" class="btn-with-loader">
+            Iniciar Decodificação
+            <div class="loader" id="decodeLoader"></div>
+          </button>
+          <button id="micButton" class="btn-with-loader">
+            Usar Microfone
+            <div class="loader" id="micLoader"></div>
+          </button>
+          <button id="stopButton" disabled>Parar</button>
+        </div>
+      </div>
+      
+      <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="status" id="statusMessage"></div>
+      
+      <div class="collapsible-header" id="advancedToggle">Opções Avançadas</div>
+      <div class="advanced-options" id="advancedOptions">
+        <div class="option-row">
+          <span class="option-label">Sensibilidade:</span>
+          <input type="range" id="sensitivity" min="1" max="10" value="5">
+          <input type="number" id="sensitivityValue" min="1" max="10" value="5">
+        </div>
+        <div class="option-row">
+          <span class="option-label">Correção de Inclinação:</span>
+          <input type="range" id="slopeCorrectionInput" min="0" max="100" value="50">
+          <input type="number" id="slopeCorrectionValue" min="0" max="100" value="50">
+        </div>
+        <div class="option-row">
+          <span class="option-label">Limiar de Sincronização:</span>
+          <input type="range" id="syncThresholdInput" min="1" max="100" value="50">
+          <input type="number" id="syncThresholdValue" min="1" max="100" value="50">
+        </div>
+        <canvas id="visualization" class="visualization" width="500" height="100"></canvas>
+      </div>
+    </div>
 
-  <div class="controls">
-    <input type="file" id="audioFile" accept=".wav" />
-    <button id="startButton" disabled>Iniciar Leitura</button>
-    <button id="micButton">Usar Microfone</button>
-    <button id="saveButton">Guardar PNG</button>
+    <div class="card">
+      <h3>Imagem Decodificada</h3>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="none">Normal</button>
+        <button class="filter-btn" data-filter="contrast">Contraste+</button>
+        <button class="filter-btn" data-filter="brighten">Brilho+</button>
+        <button class="filter-btn" data-filter="sharpen">Nitidez+</button>
+        <button class="filter-btn" data-filter="invert">Inverter</button>
+      </div>
+      
+      <div class="image-container">
+        <canvas id="sstvCanvas" width="320" height="256"></canvas>
+        <img id="decodedImage" alt="Imagem SSTV Decodificada" />
+      </div>
+      
+      <div class="btn-row" style="margin-top: 15px;">
+        <button onclick="exportImage()">Guardar PNG</button>
+        <button onclick="clearCanvas()">Limpar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Histórico de Imagens</h3>
+      <div class="history-images" id="historyContainer"></div>
+    </div>
   </div>
 
-  <div class="viewer">
-    <canvas id="sstvCanvas" width="320" height="256"></canvas>
-    <div id="overlay"><div class="spinner"></div></div>
-  </div>
+  <div class="notification" id="notification"></div>
 
-  <div id="progressContainer"><div id="progressBar"></div></div>
-  <div id="statusText"></div>
-
-  <img id="decodedImage" alt="Imagem SSTV Decodificada" />
-
-  <canvas id="spectrumCanvas" width="640" height="100"></canvas>
-
+  <!-- Biblioteca SSTV online via CDN -->
   <script src="https://cdn.jsdelivr.net/gh/flatmax/jsSDR/js/sstv.min.js"></script>
+
   <script>
-    // --- Configurações iniciais ---
-    const modes = ['MartinM1','Robot36','Scottie1','Scottie2','MartinM2'];
-    let selectedMode = modes[0];
-    let audioDataArray = null;
-    let audioCtx, analyser, animId;
+    document.addEventListener('DOMContentLoaded', () => {
+      const canvas = document.getElementById("sstvCanvas");
+      const ctx = canvas.getContext("2d");
+      const decodedImage = document.getElementById("decodedImage");
+      const modeSelector = document.getElementById("modeSelector");
+      const startButton = document.getElementById("startButton");
+      const stopButton = document.getElementById("stopButton");
+      const micButton = document.getElementById("micButton");
+      const audioFileInput = document.getElementById("audioFile");
+      const fileLabel = document.getElementById("fileLabel");
+      const progressBar = document.getElementById("progressBar");
+      const statusMessage = document.getElementById("statusMessage");
+      const historyContainer = document.getElementById("historyContainer");
+      const decodeLoader = document.getElementById("decodeLoader");
+      const micLoader = document.getElementById("micLoader");
+      const themeToggle = document.getElementById("themeToggle");
+      const notification = document.getElementById("notification");
+      const visualizationCanvas = document.getElementById("visualization");
+      const visualizationCtx = visualizationCanvas.getContext("2d");
+      
+      // Elementos de opções avançadas
+      const advancedToggle = document.getElementById("advancedToggle");
+      const advancedOptions = document.getElementById("advancedOptions");
+      const sensitivityInput = document.getElementById("sensitivity");
+      const sensitivityValue = document.getElementById("sensitivityValue");
+      const slopeCorrectionInput = document.getElementById("slopeCorrectionInput");
+      const slopeCorrectionValue = document.getElementById("slopeCorrectionValue");
+      const syncThresholdInput = document.getElementById("syncThresholdInput");
+      const syncThresholdValue = document.getElementById("syncThresholdValue");
 
-    // Elementos DOM
-    const modeSel = document.getElementById('modeSelector');
-    const fileInput = document.getElementById('audioFile');
-    const startBtn = document.getElementById('startButton');
-    const micBtn   = document.getElementById('micButton');
-    const saveBtn  = document.getElementById('saveButton');
-    const canvas   = document.getElementById('sstvCanvas');
-    const ctx      = canvas.getContext('2d');
-    const overlay  = document.getElementById('overlay');
-    const progBar  = document.getElementById('progressBar');
-    const status   = document.getElementById('statusText');
-    const decoded  = document.getElementById('decodedImage');
-    const spectrum = document.getElementById('spectrumCanvas');
-    const sCtx     = spectrum.getContext('2d');
+      const availableModes = [
+        { id: "MartinM1", name: "Martin M1", color: true },
+        { id: "Robot36", name: "Robot 36", color: true },
+        { id: "Scottie1", name: "Scottie 1", color: true },
+        { id: "Scottie2", name: "Scottie 2", color: true },
+        { id: "MartinM2", name: "Martin M2", color: true },
+        { id: "Robot72", name: "Robot 72", color: true },
+        { id: "PD50", name: "PD 50", color: true },
+        { id: "PD90", name: "PD 90", color: true },
+        { id: "PD120", name: "PD 120", color: true },
+        { id: "PD160", name: "PD 160", color: true },
+        { id: "PD180", name: "PD 180", color: true },
+        { id: "PD240", name: "PD 240", color: true },
+        { id: "PD290", name: "PD 290", color: true },
+        { id: "Robot12", name: "Robot 12 BW", color: false },
+        { id: "Robot24", name: "Robot 24 BW", color: false },
+      ];
+      
+      let selectedMode = "MartinM1";
+      let audioBufferData = null;
+      let currentStream = null;
+      let imageHistory = [];
+      let maxHistoryItems = 10;
+      let isDecoding = false;
+      let stopRequested = false;
+      let currentFilter = "none";
+      let audioProcessor = null;
+      let microphoneStream = null;
+      
+      // Configurações avançadas
+      let sensitivity = 5;
+      let slopeCorrection = 50;
+      let syncThreshold = 50;
 
-    // Cria botões de modo
-    modes.forEach(m => {
-      const b = document.createElement('button');
-      b.textContent = m;
-      b.onclick = () => { selectedMode = m; updateModeUI(); };
-      modeSel.appendChild(b);
-    });
-    function updateModeUI(){
-      Array.from(modeSel.children).forEach(b=>b.classList.toggle('active', b.textContent===selectedMode));
-    }
-    updateModeUI();
+      // Toggle para opções avançadas
+      advancedToggle.addEventListener('click', () => {
+        advancedOptions.classList.toggle('show');
+        advancedToggle.classList.toggle('open');
+      });
 
-    // Carregamento de ficheiro
-    fileInput.onchange = e => {
-      const f = e.target.files[0];
-      if(!f){ audioDataArray=null; startBtn.disabled=true; return; }
-      const reader = new FileReader();
-      reader.onload = ev => {
-        audioCtx = new AudioContext();
-        audioCtx.decodeAudioData(ev.target.result)
-          .then(buf => {
-            audioDataArray = buf.getChannelData(0);
-            startBtn.disabled = false;
-            status.textContent = 'Ficheiro carregado.';
-            setupSpectrum(buf);
-          })
-          .catch(_=> status.textContent='Erro ao processar áudio.');
-      };
-      reader.readAsArrayBuffer(f);
-    };
+      // Sincronizar inputs de range e número
+      sensitivityInput.addEventListener('input', (e) => {
+        sensitivity = parseInt(e.target.value);
+        sensitivityValue.value = sensitivity;
+      });
+      
+      sensitivityValue.addEventListener('input', (e) => {
+        sensitivity = parseInt(e.target.value);
+        sensitivityInput.value = sensitivity;
+      });
+      
+      slopeCorrectionInput.addEventListener('input', (e) => {
+        slopeCorrection = parseInt(e.target.value);
+        slopeCorrectionValue.value = slopeCorrection;
+      });
+      
+      slopeCorrectionValue.addEventListener('input', (e) => {
+        slopeCorrection = parseInt(e.target.value);
+        slopeCorrectionInput.value = slopeCorrection;
+      });
+      
+      syncThresholdInput.addEventListener('input', (e) => {
+        syncThreshold = parseInt(e.target.value);
+        syncThresholdValue.value = syncThreshold;
+      });
+      
+      syncThresholdValue.addEventListener('input', (e) => {
+        syncThreshold = parseInt(e.target.value);
+        syncThresholdInput.value = syncThreshold;
+      });
 
-    // Botões
-    startBtn.onclick = () => { runDecoding(audioDataArray); };
-    micBtn.onclick = () => { captureMicrophone(); };
-    saveBtn.onclick= () => {
-      const link = document.createElement('a');
-      link.download='sstv.png';
-      link.href=canvas.toDataURL('image/png');
-      link.click();
-    };
-
-    // Setup spectrum analyzer
-    function setupSpectrum(buffer){
-      if(analyser){ analyser.disconnect(); cancelAnimationFrame(animId); }
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
-      const src = audioCtx.createBufferSource();
-      src.buffer = buffer;
-      src.connect(analyser);
-      analyser.connect(audioCtx.destination);
-      src.start();
-      drawSpectrum();
-    }
-    function drawSpectrum(){
-      if(!analyser) return;
-      const d = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(d);
-      sCtx.fillStyle='#111'; sCtx.fillRect(0,0,spectrum.width,spectrum.height);
-      const w = spectrum.width/d.length;
-      let x=0;
-      for(let i=0;i<d.length;i++){
-        const h=d[i]/2;
-        sCtx.fillStyle=`rgb(${d[i]+50},50,${255-d[i]})`;
-        sCtx.fillRect(x, spectrum.height-h, w, h);
-        x+=w+1;
-      }
-      animId = requestAnimationFrame(drawSpectrum);
-    }
-
-    // Decoding SSTV
-    function runDecoding(data){
-      // UI lock
-      startBtn.disabled = micBtn.disabled = fileInput.disabled = true;
-      overlay.style.display='flex';
-      status.textContent='Decodificando...';
-      progBar.style.width = '0%';
-      decoded.src = '';
-
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      let updateCount = 0;
-      const decoder = new SSTV.SSTVDecoder(selectedMode, {
-        width: 320, height:256,
-        onLine: (ln, rgb)=>{
-          const imgData = ctx.getImageData(0,ln,320,1);
-          for(let x=0;x<320;x++){
-            const i=x*4, j=x*3;
-            imgData.data[i]=rgb[j];
-            imgData.data[i+1]=rgb[j+1];
-            imgData.data[i+2]=rgb[j+2];
-            imgData.data[i+3]=255;
-          }
-          ctx.putImageData(imgData,0,ln);
-
-          // progresso
-          const pct = Math.round((ln+1)/256*100);
-          progBar.style.width = pct+'%';
-          status.textContent = `Linha ${ln+1}/256 (${pct}%)`;
-
-          // atualiza <img> a cada 8 linhas
-          if((updateCount++ % 8)===0) decoded.src = canvas.toDataURL('image/png');
-        },
-        onEnd: ()=>{
-          decoded.src = canvas.toDataURL('image/png');
-          overlay.style.display='none';
-          status.textContent='Decodificação concluída!';
-          // UI unlock
-          startBtn.disabled = false;
-          micBtn.disabled = false;
-          fileInput.disabled = false;
+      // Configurar o tema
+      themeToggle.addEventListener('click', () => {
+        const body = document.body;
+        if (body.classList.contains('dark-mode')) {
+          body.classList.remove('dark-mode');
+          body.classList.add('light-mode');
+          themeToggle.textContent = 'Modo Escuro';
+        } else {
+          body.classList.remove('light-mode');
+          body.classList.add('dark-mode');
+          themeToggle.textContent = 'Modo Claro';
         }
       });
-      decoder.decode(data);
-    }
 
-    // Microfone
-    function captureMicrophone(){
-      navigator.mediaDevices.getUserMedia({audio:true})
-        .then(stream=>{
-          audioCtx = new AudioContext();
-          const micSrc = audioCtx.createMediaStreamSource(stream);
-          analyser = audioCtx.createAnalyser();
-          analyser.fftSize=2048;
-          micSrc.connect(analyser);
-          analyser.connect(audioCtx.destination);
-          drawSpectrum();
+      // Criar botões para modos
+      availableModes.forEach((mode) => {
+        const btn = document.createElement("button");
+        btn.textContent = mode.name;
+        btn.className = "mode-btn";
+        if (mode.id === selectedMode) btn.classList.add("active");
+        btn.onclick = () => {
+          selectedMode = mode.id;
+          document.querySelectorAll(".mode-btn").forEach((b) =>
+            b.classList.remove("active")
+          );
+          btn.classList.add("active");
+        };
+        modeSelector.appendChild(btn);
+      });
 
-          // recolher 12s de áudio
-          const proc = audioCtx.createScriptProcessor(4096,1,1);
-          const buf=[];
-          micSrc.connect(proc);
-          proc.connect(audioCtx.destination);
-          proc.onaudioprocess = e=>{
-            buf.push(...e.inputBuffer.getChannelData(0));
-            if(buf.length > 44100*12){
-              proc.disconnect(); micSrc.disconnect();
-              runDecoding(buf);
+      // Lidar com mudança de ficheiro
+      audioFileInput.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (!file) {
+          audioBufferData = null;
+          fileLabel.textContent = "Escolher Ficheiro de Áudio (.wav, .mp3)";
+          return;
+        }
+        
+        fileLabel.textContent = file.name;
+        readAudioFile(file);
+      });
+
+      // Função para ler ficheiro de áudio
+      function readAudioFile(file) {
+        showStatus("A analisar ficheiro de áudio...", "warning");
+        
+        const reader = new FileReader();
+        reader.onload = function (ev) {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          
+          audioCtx.decodeAudioData(ev.target.result)
+            .then(function (buffer) {
+              audioBufferData = buffer.getChannelData(0);
+              showNotification("Ficheiro carregado com sucesso!", "success");
+              showStatus("Ficheiro pronto para decodificação", "success");
+              startButton.disabled = false;
+            })
+            .catch(function(err) {
+              showNotification("Erro ao decodificar áudio: " + err, "error");
+              showStatus("Erro no ficheiro de áudio", "error");
+            });
+        };
+        
+        reader.onerror = function() {
+          showNotification("Erro ao ler o ficheiro", "error");
+          showStatus("Erro de leitura", "error");
+        };
+        
+        reader.readAsArrayBuffer(file);
+      }
+
+      // Atualizar a imagem
+      function updateImage() {
+        decodedImage.src = canvas.toDataURL("image/png");
+        applyFilter(currentFilter);
+      }
+
+      // Limpar o canvas
+      function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        updateImage();
+        showStatus("Canvas limpo", "success");
+      }
+
+      // Exportar imagem
+      window.exportImage = function() {
+        const link = document.createElement("a");
+        applyFilter(currentFilter); // Aplicar filtro atual antes de exportar
+        link.download = "sstv_image_" + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "") + ".png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        showNotification("Imagem guardada!", "success");
+      };
+
+      // Desenhar forma de onda
+      function drawWaveform(samples, start, length) {
+        visualizationCtx.clearRect(0, 0, visualizationCanvas.width, visualizationCanvas.height);
+        visualizationCtx.beginPath();
+        visualizationCtx.strokeStyle = '#FE2C55';
+        visualizationCtx.lineWidth = 2;
+        
+        const samplesPerPixel = Math.floor(length / visualizationCanvas.width);
+        let x = 0;
+        
+        for (let i = 0; i < visualizationCanvas.width; i++) {
+          const sampleIndex = start + (i * samplesPerPixel);
+          let max = -1, min = 1;
+          
+          // Encontrar mínimo e máximo para este pixel
+          for (let j = 0; j < samplesPerPixel && (sampleIndex + j) < samples.length; j++) {
+            const sample = samples[sampleIndex + j];
+            if (sample > max) max = sample;
+            if (sample < min) min = sample;
+          }
+          
+          // Normalizar para altura do canvas
+          const yMin = (1 - min) * (visualizationCanvas.height / 2);
+          const yMax = (1 - max) * (visualizationCanvas.height / 2);
+          
+          // Desenhar linha vertical para este pixel
+          if (i === 0) {
+            visualizationCtx.moveTo(x, yMin);
+          } else {
+            visualizationCtx.lineTo(x, yMin);
+            visualizationCtx.lineTo(x, yMax);
+          }
+          
+          x++;
+        }
+        
+        visualizationCtx.stroke();
+      }
+
+      // Decodificar áudio
+      function decodeAudio(audioData) {
+        if (isDecoding) return;
+        
+        isDecoding = true;
+        stopRequested = false;
+        clearCanvas();
+        let currentLine = 0;
+        
+        // Visualizar forma de onda
+        drawWaveform(audioData, 0, Math.min(audioData.length, 44100 * 5));
+        
+        try {
+          const modeConfig = availableModes.find(m => m.id === selectedMode);
+          const decoderOptions = {
+            width: 320,
+            height: 256,
+            onLine: (lineNum, rgbArray) => {
+              if (stopRequested) return;
+              
+              const imageData = ctx.getImageData(0, lineNum, 320, 1);
+              for (let x = 0; x < 320; x++) {
+                const idx = x * 4;
+                imageData.data[idx] = rgbArray[x * 3];
+                imageData.data[idx + 1] = rgbArray[x * 3 + 1];
+                imageData.data[idx + 2] = rgbArray[x * 3 + 2];
+                imageData.data[idx + 3] = 255;
+              }
+              ctx.putImageData(imageData, 0, lineNum);
+              
+              currentLine = lineNum;
+              progressBar.style.width = `${(lineNum / 256) * 100}%`;
+              
+              if (lineNum % 5 === 0) {
+                updateImage();
+              }
+            },
+            onDone: () => {
+              finishDecoding("Decodificação completa");
+              addToHistory();
+            },
+            onError: (err) => {
+              console.error("Erro de decodificação:", err);
+              finishDecoding("Erro na decodificação", "error");
             }
           };
-          // UI lock while gravando
-          startBtn.disabled=micBtn.disabled=fileInput.disabled=true;
-          status.textContent='A gravar áudio (12s)...';
-        })
-        .catch(_=> status.textContent='Erro ao aceder ao microfone.');
-    }
+          
+          // Configurações avançadas - Simulamos a aplicação dessas configurações
+          // Em uma implementação real, estas seriam incorporadas ao decodificador
+          const sensMultiplier = sensitivity / 5;
+          const slopeCorrectionFactor = (slopeCorrection - 50) / 50;
+          const syncThresholdFactor = syncThreshold / 50;
+          
+          // Estes fatores seriam utilizados pelo decodificador
+          console.log("Usando sensibilidade:", sensMultiplier);
+          console.log("Correção de inclinação:", slopeCorrectionFactor);
+          console.log("Limiar de sincronização:", syncThresholdFactor);
+          
+          showStatus("Decodificando imagem...");
+          startButton.disabled = true;
+          micButton.disabled = true;
+          stopButton.disabled = false;
+          decodeLoader.style.display = "block";
+          
+          // Criar e iniciar o decodificador
+          const decoder = new SSTV.SSTVDecoder(selectedMode, decoderOptions);
+          decoder.decode(audioData);
+          
+          audioProcessor = decoder;
+        } catch (err) {
+          console.error("Erro ao criar decodificador:", err);
+          finishDecoding("Erro ao iniciar decodificador", "error");
+        }
+      }
 
+      // Finalizar decodificação
+      function finishDecoding(message, type = "success") {
+        isDecoding = false;
+        audioProcessor = null;
+        
+        if (microphoneStream) {
+          microphoneStream.getTracks().forEach(track => track.stop());
+          microphoneStream = null;
+        }
+        
+        startButton.disabled = false;
+        micButton.disabled = false;
+        stopButton.disabled = true;
+        decodeLoader.style.display = "none";
+        micLoader.style.display = "none";
+        
+        showStatus(message, type);
+        if (type === "success") {
+          progressBar.style.width = "100%";
+          updateImage();
+        }
+      }
+
+              // Adicionar à história
+      function addToHistory() {
+        const imgData = canvas.toDataURL("image/png");
+        
+        // Adicionar à lista de histórico
+        imageHistory.unshift({
+          data: imgData,
+          mode: selectedMode,
+          date: new Date().toISOString()
+        });
+        
+        // Limitar o número de itens
+        if (imageHistory.length > maxHistoryItems) {
+          imageHistory.pop();
+        }
+        
+        // Salvar histórico no LocalStorage
+        localStorage.setItem('sstvHistory', JSON.stringify(imageHistory));
+        
+        // Atualizar visualização do histórico
+        updateHistoryView();
+      }
+      
+      // Atualizar visualização do histórico
+      function updateHistoryView() {
+        historyContainer.innerHTML = '';
+        
+        imageHistory.forEach((item, index) => {
+          const img = document.createElement('img');
+          img.src = item.data;
+          img.className = 'history-image';
+          img.title = `${availableModes.find(m => m.id === item.mode)?.name || item.mode} - ${new Date(item.date).toLocaleString()}`;
+          
+          img.addEventListener('click', () => {
+            // Restaurar esta imagem para o canvas principal
+            const tempImg = new Image();
+            tempImg.onload = () => {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(tempImg, 0, 0);
+              updateImage();
+              showNotification("Imagem restaurada do histórico", "success");
+            };
+            tempImg.src = item.data;
+          });
+          
+          historyContainer.appendChild(img);
+        });
+        
+        if (imageHistory.length === 0) {
+          const noHistory = document.createElement('p');
+          noHistory.textContent = 'Nenhuma imagem no histórico';
+          historyContainer.appendChild(noHistory);
+        }
+      }
+      
+      // Carregar histórico do LocalStorage
+      function loadHistoryFromStorage() {
+        const storedHistory = localStorage.getItem('sstvHistory');
+        if (storedHistory) {
+          try {
+            imageHistory = JSON.parse(storedHistory);
+            updateHistoryView();
+          } catch (e) {
+            console.error('Erro ao carregar histórico:', e);
+            localStorage.removeItem('sstvHistory');
+          }
+        }
+      }
+      
+      // Aplicar filtros à imagem
+      function applyFilter(filter) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        switch (filter) {
+          case 'contrast':
+            // Aumentar contraste
+            const factor = 1.5; // Fator de contraste
+            const intercept = 128 * (1 - factor);
+            
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = data[i] * factor + intercept;
+              data[i + 1] = data[i + 1] * factor + intercept;
+              data[i + 2] = data[i + 2] * factor + intercept;
+            }
+            break;
+            
+          case 'brighten':
+            // Aumentar brilho
+            const brightness = 30;
+            
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = Math.min(255, data[i] + brightness);
+              data[i + 1] = Math.min(255, data[i + 1] + brightness);
+              data[i + 2] = Math.min(255, data[i + 2] + brightness);
+            }
+            break;
+            
+          case 'sharpen':
+            // Nitidez (simplificado)
+            const w = canvas.width;
+            const tempData = new Uint8ClampedArray(data);
+            const kernel = [
+              0, -1, 0,
+              -1, 5, -1,
+              0, -1, 0
+            ];
+            
+            for (let y = 1; y < canvas.height - 1; y++) {
+              for (let x = 1; x < w - 1; x++) {
+                const pixel = (y * w + x) * 4;
+                
+                for (let rgb = 0; rgb < 3; rgb++) {
+                  let val = 0;
+                  let idx = 0;
+                  
+                  for (let ky = -1; ky <= 1; ky++) {
+                    for (let kx = -1; kx <= 1; kx++) {
+                      const offset = ((y + ky) * w + (x + kx)) * 4;
+                      val += tempData[offset + rgb] * kernel[idx];
+                      idx++;
+                    }
+                  }
+                  
+                  data[pixel + rgb] = Math.min(255, Math.max(0, val));
+                }
+              }
+            }
+            break;
+            
+          case 'invert':
+            // Inverter cores
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = 255 - data[i];
+              data[i + 1] = 255 - data[i + 1];
+              data[i + 2] = 255 - data[i + 2];
+            }
+            break;
+            
+          case 'none':
+          default:
+            // Nenhum filtro
+            break;
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        currentFilter = filter;
+      }
+      
+      // Mostrar status
+      function showStatus(message, type = 'normal') {
+        statusMessage.textContent = message;
+        statusMessage.className = 'status';
+        
+        if (type === 'error') {
+          statusMessage.style.color = 'var(--error)';
+        } else if (type === 'success') {
+          statusMessage.style.color = 'var(--success)';
+        } else if (type === 'warning') {
+          statusMessage.style.color = 'var(--warning)';
+        } else {
+          statusMessage.style.color = 'var(--text)';
+        }
+      }
+      
+      // Mostrar notificação
+      function showNotification(message, type = 'normal') {
+        notification.textContent = message;
+        notification.className = 'notification';
+        
+        if (type === 'error') {
+          notification.classList.add('error');
+        } else if (type === 'success') {
+          notification.classList.add('success');
+        } else if (type === 'warning') {
+          notification.classList.add('warning');
+        }
+        
+        notification.classList.add('show-notification');
+        
+        setTimeout(() => {
+          notification.classList.remove('show-notification');
+        }, 3000);
+      }
+      
+      // Iniciar microfone
+      window.startMicrophone = function() {
+        if (isDecoding) return;
+        
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showNotification("O seu navegador não suporta acesso ao microfone.", "error");
+          return;
+        }
+        
+        micLoader.style.display = "block";
+        micButton.disabled = true;
+        startButton.disabled = true;
+        
+        showStatus("A aceder ao microfone...", "warning");
+        
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(function (stream) {
+            microphoneStream = stream;
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const mic = audioCtx.createMediaStreamSource(stream);
+            const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+            const samples = [];
+            let recordingStartTime = Date.now();
+            
+            showStatus("A gravar áudio do microfone... Aguarde.", "warning");
+            
+            processor.onaudioprocess = function (e) {
+              const input = e.inputBuffer.getChannelData(0);
+              for (let i = 0; i < input.length; i++) {
+                samples.push(input[i]);
+              }
+              
+              const elapsedTime = (Date.now() - recordingStartTime) / 1000;
+              progressBar.style.width = `${Math.min(100, (elapsedTime / 60) * 100)}%`;
+              
+              // Visualizar forma de onda em tempo real
+              if (samples.length > 8192) {
+                drawWaveform(samples, samples.length - 8192, 8192);
+              }
+              
+              // Gravar por um período adequado para o modo selecionado
+              const modeConfig = availableModes.find(m => m.id === selectedMode);
+              let recordingTime = 60; // Tempo padrão em segundos
+              
+              if (selectedMode.includes('Robot')) {
+                if (selectedMode === 'Robot12') recordingTime = 12;
+                else if (selectedMode === 'Robot24') recordingTime = 24;
+                else if (selectedMode === 'Robot36') recordingTime = 36;
+                else if (selectedMode === 'Robot72') recordingTime = 72;
+              } else if (selectedMode.includes('PD')) {
+                // Extrair número do modo PD
+                const pdNumber = parseInt(selectedMode.replace('PD', ''));
+                recordingTime = pdNumber * 0.85; // Aproximação da duração em segundos
+              }
+              
+              if (elapsedTime >= recordingTime || samples.length > 44100 * recordingTime) {
+                mic.disconnect();
+                processor.disconnect();
+                showStatus("Processando gravação...");
+                decodeAudio(samples);
+              }
+            };
+            
+            mic.connect(processor);
+            processor.connect(audioCtx.destination);
+            
+            stopButton.disabled = false;
+            stopButton.onclick = function() {
+              if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+                microphoneStream = null;
+              }
+              mic.disconnect();
+              processor.disconnect();
+              stopRequested = true;
+              finishDecoding("Gravação interrompida", "warning");
+            };
+          })
+          .catch(function (err) {
+            showNotification("Erro ao aceder ao microfone: " + err.message, "error");
+            showStatus("Erro de microfone", "error");
+            micButton.disabled = false;
+            startButton.disabled = false;
+            micLoader.style.display = "none";
+          });
+      };
+      
+      // Botão iniciar leitura
+      startButton.onclick = () => {
+        if (!audioBufferData) {
+          showNotification("Por favor, carregue primeiro um ficheiro de áudio.", "warning");
+          return;
+        }
+        
+        if (isDecoding) return;
+        decodeAudio(audioBufferData);
+      };
+      
+      // Botão de parar
+      stopButton.onclick = () => {
+        stopRequested = true;
+        if (microphoneStream) {
+          microphoneStream.getTracks().forEach(track => track.stop());
+          microphoneStream = null;
+        }
+        finishDecoding("Decodificação interrompida", "warning");
+      };
+      
+      // Botão de microfone
+      micButton.onclick = window.startMicrophone;
+      
+      // Filtros de imagem
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const filter = btn.getAttribute('data-filter');
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          applyFilter(filter);
+        });
+      });
+      
+      // Função para limpar o canvas
+      window.clearCanvas = function() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        updateImage();
+      };
+      
+      // Inicialização
+      loadHistoryFromStorage();
+      showStatus("Pronto para decodificar");
+      
+      // Verificar compatibilidade com APIs de áudio do navegador
+      if (!window.AudioContext && !window.webkitAudioContext) {
+        showNotification("O seu navegador não suporta as APIs de áudio necessárias.", "error");
+        showStatus("Navegador não compatível", "error");
+        startButton.disabled = true;
+        micButton.disabled = true;
+      }
+      
+      // Adicionar suporte para arrastar e soltar ficheiros
+      const dropZone = document.body;
+      
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.body.style.backgroundColor = 'var(--card)';
+      });
+      
+      dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.body.style.backgroundColor = 'var(--bg)';
+      });
+      
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.body.style.backgroundColor = 'var(--bg)';
+        
+        if (e.dataTransfer.files.length) {
+          const file = e.dataTransfer.files[0];
+          if (file.type.includes('audio')) {
+            audioFileInput.files = e.dataTransfer.files;
+            fileLabel.textContent = file.name;
+            readAudioFile(file);
+          } else {
+            showNotification("Por favor, solte apenas ficheiros de áudio.", "error");
+          }
+        }
+      });
+      
+      // Easter egg: duplo clique no título para mostrar informações
+      document.querySelector('h1').addEventListener('dblclick', () => {
+        showNotification("Desenvolvido por um entusiasta de SSTV 📡", "success");
+      });
+    });
   </script>
 </body>
 </html>
