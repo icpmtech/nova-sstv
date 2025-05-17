@@ -1,95 +1,330 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-PT">
 <head>
-  <meta charset="UTF-8">
-  <title>SSTV Decoder - Martin M1</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>SSTV Decoder Aprimorado</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
+    :root {
+      --bg: #000;
+      --accent: #FE2C55;
+      --text: #fff;
+      --card: #1a1a1a;
+      --spinner-size: 50px;
+    }
+    * { box-sizing: border-box; }
     body {
+      background: var(--bg);
+      color: var(--text);
       font-family: Arial, sans-serif;
-      background: #111;
-      color: #fff;
       text-align: center;
-      padding: 20px;
+      margin: 0;
+      padding: 2rem;
     }
-    canvas {
-      border: 2px solid #fff;
-      margin-top: 20px;
+    h1 {
+      color: var(--accent);
+      margin-bottom: 1rem;
     }
-    input {
-      margin: 10px 0;
+    .mode-selector {
+      margin-bottom: 1rem;
+    }
+    .mode-selector button {
+      background: var(--card);
+      border: 2px solid var(--accent);
+      color: var(--text);
+      padding: 8px 16px;
+      margin: 0 5px 8px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    .mode-selector button.active,
+    .mode-selector button:hover {
+      background: var(--accent);
+      color: #000;
+    }
+    .controls {
+      margin-bottom: 1rem;
+    }
+    .controls input,
+    .controls button {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      background: var(--card);
+      color: var(--text);
+      font-size: 1rem;
+      margin: 5px;
+      cursor: pointer;
+      min-width: 160px;
+    }
+    .controls button:hover:not([disabled]) {
+      background: var(--accent);
+      color: #000;
+    }
+    .controls button[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .viewer {
+      position: relative;
+      display: inline-block;
+    }
+    canvas, img {
+      display: block;
+      border: 2px solid var(--accent);
+      image-rendering: pixelated;
+      width: 320px;
+      height: 256px;
+    }
+    #decodedImage {
+      margin-top: 1rem;
+    }
+    /* Overlay spinner */
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      width: var(--spinner-size);
+      height: var(--spinner-size);
+      border: 5px solid var(--card);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    /* Progress bar */
+    #progressContainer {
+      width: 320px;
+      margin: 1rem auto;
+      background: #222;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #progressBar {
+      width: 0%;
+      height: 10px;
+      background: var(--accent);
+      transition: width 0.1s;
+    }
+    #statusText {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--accent);
+      min-height: 1.2em;
+    }
+    /* Spectrum */
+    #spectrumCanvas {
+      margin-top: 1.5rem;
+      width: 640px; height: 100px;
+      background: #111;
+      display: block; margin-left: auto; margin-right: auto;
+      border-radius: 8px;
     }
   </style>
 </head>
 <body>
-  <h1>SSTV Decoder (Martin M1)</h1>
-  <input type="file" accept=".wav" id="audioFile">
-  <button onclick="startMicrophone()">Usar Microfone</button>
-  <canvas id="sstvCanvas" width="320" height="256"></canvas>
+
+  <h1>SSTV Decoder Aprimorado</h1>
+
+  <div class="mode-selector" id="modeSelector"></div>
+
+  <div class="controls">
+    <input type="file" id="audioFile" accept=".wav" />
+    <button id="startButton" disabled>Iniciar Leitura</button>
+    <button id="micButton">Usar Microfone</button>
+    <button id="saveButton">Guardar PNG</button>
+  </div>
+
+  <div class="viewer">
+    <canvas id="sstvCanvas" width="320" height="256"></canvas>
+    <div id="overlay"><div class="spinner"></div></div>
+  </div>
+
+  <div id="progressContainer"><div id="progressBar"></div></div>
+  <div id="statusText"></div>
+
+  <img id="decodedImage" alt="Imagem SSTV Decodificada" />
+
+  <canvas id="spectrumCanvas" width="640" height="100"></canvas>
 
   <script src="https://cdn.jsdelivr.net/gh/flatmax/jsSDR/js/sstv.min.js"></script>
   <script>
-    const canvas = document.getElementById('sstvCanvas');
-    const ctx = canvas.getContext('2d');
+    // --- Configurações iniciais ---
+    const modes = ['MartinM1','Robot36','Scottie1','Scottie2','MartinM2'];
+    let selectedMode = modes[0];
+    let audioDataArray = null;
+    let audioCtx, analyser, animId;
 
-    function decodeAudio(audioBuffer) {
-      const decoder = new SSTV.SSTVDecoder("MartinM1", {
-        width: 320,
-        height: 256,
-        onLine: (lineNum, rgbArray) => {
-          const imageData = ctx.getImageData(0, lineNum, 320, 1);
-          for (let x = 0; x < 320; x++) {
-            const idx = x * 4;
-            imageData.data[idx] = rgbArray[x * 3];
-            imageData.data[idx + 1] = rgbArray[x * 3 + 1];
-            imageData.data[idx + 2] = rgbArray[x * 3 + 2];
-            imageData.data[idx + 3] = 255;
+    // Elementos DOM
+    const modeSel = document.getElementById('modeSelector');
+    const fileInput = document.getElementById('audioFile');
+    const startBtn = document.getElementById('startButton');
+    const micBtn   = document.getElementById('micButton');
+    const saveBtn  = document.getElementById('saveButton');
+    const canvas   = document.getElementById('sstvCanvas');
+    const ctx      = canvas.getContext('2d');
+    const overlay  = document.getElementById('overlay');
+    const progBar  = document.getElementById('progressBar');
+    const status   = document.getElementById('statusText');
+    const decoded  = document.getElementById('decodedImage');
+    const spectrum = document.getElementById('spectrumCanvas');
+    const sCtx     = spectrum.getContext('2d');
+
+    // Cria botões de modo
+    modes.forEach(m => {
+      const b = document.createElement('button');
+      b.textContent = m;
+      b.onclick = () => { selectedMode = m; updateModeUI(); };
+      modeSel.appendChild(b);
+    });
+    function updateModeUI(){
+      Array.from(modeSel.children).forEach(b=>b.classList.toggle('active', b.textContent===selectedMode));
+    }
+    updateModeUI();
+
+    // Carregamento de ficheiro
+    fileInput.onchange = e => {
+      const f = e.target.files[0];
+      if(!f){ audioDataArray=null; startBtn.disabled=true; return; }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        audioCtx = new AudioContext();
+        audioCtx.decodeAudioData(ev.target.result)
+          .then(buf => {
+            audioDataArray = buf.getChannelData(0);
+            startBtn.disabled = false;
+            status.textContent = 'Ficheiro carregado.';
+            setupSpectrum(buf);
+          })
+          .catch(_=> status.textContent='Erro ao processar áudio.');
+      };
+      reader.readAsArrayBuffer(f);
+    };
+
+    // Botões
+    startBtn.onclick = () => { runDecoding(audioDataArray); };
+    micBtn.onclick = () => { captureMicrophone(); };
+    saveBtn.onclick= () => {
+      const link = document.createElement('a');
+      link.download='sstv.png';
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+    };
+
+    // Setup spectrum analyzer
+    function setupSpectrum(buffer){
+      if(analyser){ analyser.disconnect(); cancelAnimationFrame(animId); }
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      src.start();
+      drawSpectrum();
+    }
+    function drawSpectrum(){
+      if(!analyser) return;
+      const d = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(d);
+      sCtx.fillStyle='#111'; sCtx.fillRect(0,0,spectrum.width,spectrum.height);
+      const w = spectrum.width/d.length;
+      let x=0;
+      for(let i=0;i<d.length;i++){
+        const h=d[i]/2;
+        sCtx.fillStyle=`rgb(${d[i]+50},50,${255-d[i]})`;
+        sCtx.fillRect(x, spectrum.height-h, w, h);
+        x+=w+1;
+      }
+      animId = requestAnimationFrame(drawSpectrum);
+    }
+
+    // Decoding SSTV
+    function runDecoding(data){
+      // UI lock
+      startBtn.disabled = micBtn.disabled = fileInput.disabled = true;
+      overlay.style.display='flex';
+      status.textContent='Decodificando...';
+      progBar.style.width = '0%';
+      decoded.src = '';
+
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      let updateCount = 0;
+      const decoder = new SSTV.SSTVDecoder(selectedMode, {
+        width: 320, height:256,
+        onLine: (ln, rgb)=>{
+          const imgData = ctx.getImageData(0,ln,320,1);
+          for(let x=0;x<320;x++){
+            const i=x*4, j=x*3;
+            imgData.data[i]=rgb[j];
+            imgData.data[i+1]=rgb[j+1];
+            imgData.data[i+2]=rgb[j+2];
+            imgData.data[i+3]=255;
           }
-          ctx.putImageData(imageData, 0, lineNum);
+          ctx.putImageData(imgData,0,ln);
+
+          // progresso
+          const pct = Math.round((ln+1)/256*100);
+          progBar.style.width = pct+'%';
+          status.textContent = `Linha ${ln+1}/256 (${pct}%)`;
+
+          // atualiza <img> a cada 8 linhas
+          if((updateCount++ % 8)===0) decoded.src = canvas.toDataURL('image/png');
+        },
+        onEnd: ()=>{
+          decoded.src = canvas.toDataURL('image/png');
+          overlay.style.display='none';
+          status.textContent='Decodificação concluída!';
+          // UI unlock
+          startBtn.disabled = false;
+          micBtn.disabled = false;
+          fileInput.disabled = false;
         }
       });
-
-      decoder.decode(audioBuffer);
+      decoder.decode(data);
     }
 
-    document.getElementById('audioFile').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = function(ev) {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        audioCtx.decodeAudioData(ev.target.result, function(buffer) {
-          decodeAudio(buffer.getChannelData(0)); // Mono
-        });
-      };
-      reader.readAsArrayBuffer(file);
-    });
+    // Microfone
+    function captureMicrophone(){
+      navigator.mediaDevices.getUserMedia({audio:true})
+        .then(stream=>{
+          audioCtx = new AudioContext();
+          const micSrc = audioCtx.createMediaStreamSource(stream);
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize=2048;
+          micSrc.connect(analyser);
+          analyser.connect(audioCtx.destination);
+          drawSpectrum();
 
-    function startMicrophone() {
-      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const mic = audioCtx.createMediaStreamSource(stream);
-        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-        const samples = [];
-
-        processor.onaudioprocess = function(e) {
-          const input = e.inputBuffer.getChannelData(0);
-          for (let i = 0; i < input.length; i++) {
-            samples.push(input[i]);
-          }
-
-          if (samples.length > 44100 * 12) { // ~12s
-            mic.disconnect();
-            processor.disconnect();
-            decodeAudio(samples);
-          }
-        };
-
-        mic.connect(processor);
-        processor.connect(audioCtx.destination);
-      }).catch(function(err) {
-        alert("Erro ao aceder ao microfone: " + err);
-      });
+          // recolher 12s de áudio
+          const proc = audioCtx.createScriptProcessor(4096,1,1);
+          const buf=[];
+          micSrc.connect(proc);
+          proc.connect(audioCtx.destination);
+          proc.onaudioprocess = e=>{
+            buf.push(...e.inputBuffer.getChannelData(0));
+            if(buf.length > 44100*12){
+              proc.disconnect(); micSrc.disconnect();
+              runDecoding(buf);
+            }
+          };
+          // UI lock while gravando
+          startBtn.disabled=micBtn.disabled=fileInput.disabled=true;
+          status.textContent='A gravar áudio (12s)...';
+        })
+        .catch(_=> status.textContent='Erro ao aceder ao microfone.');
     }
+
   </script>
 </body>
 </html>
